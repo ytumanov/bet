@@ -1,0 +1,2 @@
+# bet
+betting contract
