@@ -16,9 +16,7 @@ contract Bets {
     uint public sideLoserMoney;
     address[] public addressesA;
     address[] public addressesB;
-    address[] public winnersAddresses;
-    
-
+    address[] public winnersAddresses;   
     
     struct Bet {
         uint betId;
@@ -31,7 +29,6 @@ contract Bets {
          uint award;
          bool awardReceived;
      }
-
   
     mapping(address => Bet) public _betsA;
     mapping(address => Bet) public _betsB;
@@ -58,7 +55,7 @@ contract Bets {
         }
     _;
     }
-
+        
         
     function startBetting() onlyAdmin() returns(bool) {
         if(winnersAddresses.length == 0 && status == Status.Finished){
@@ -92,7 +89,6 @@ contract Bets {
     function getContractBalance() returns(uint){
         return this.balance;
     }
-
    
     function assert(bool condition) internal {
         if(!condition) { throw; }
@@ -103,7 +99,6 @@ contract Bets {
         assert(c >= a);
         return c;
     }
-
    
     function bet(string side) payable onlyNotAdmin() returns(bool) {
         if(status != Status.Started || msg.value < 100) { throw; }
@@ -146,7 +141,6 @@ contract Bets {
 
         BetSuccessful(msg.sender, msg.value, side, betId);
         return true;
-        
     }
 
     function closeBetting(string winnerSide) onlyAdmin() returns(bool){               
@@ -167,7 +161,6 @@ contract Bets {
         }
         else{ throw; }
         
-
         uint adminFee = sideLoserMoney / 10;
 
         if(!admin.send(adminFee)){
@@ -175,11 +168,8 @@ contract Bets {
         } 
 
         BettingClosed(adminFee);
-
         sideLoserMoney = sideLoserMoney - adminFee;                        
-            
         return true;
-
     }
 
     function sendSingleReward(uint betId) external returns(bool){
@@ -188,7 +178,6 @@ contract Bets {
         Winner memory winner = _winners[winnersAddresses[winnerIndex]];
         if(status != Status.Finished || winnersAddresses.length == 0 || winner.awardReceived == true) { throw; }                                  
         
-                
         if(sha3(winnerResult) == sha3(aSide)){
             winBet = _betsA[winnersAddresses[winnerIndex]];
         }
@@ -201,14 +190,14 @@ contract Bets {
         winner.award = winBet.betValue + profitCash;
         winner.awardReceived = true;                           
            
-
-        if(!winnersAddresses[winnerIndex].send(winBet.betValue + profitCash)){
-                 throw;
-        }  
+        if(!winnersAddresses[winnerIndex].send(winner.award)) { throw; }  
         
         BenefitSuccessful(winnersAddresses[winnerIndex], winner.award); 
-        
         return true;
+    } 
 
-    }   
+    function sendRemaining() onlyAdmin() returns(bool) {
+        suicide(admin);
+        return true;
+    }  
 }
