@@ -9,15 +9,19 @@ contract Bets {
     string public aSide = 'a';
     string public bSide = 'b';
     string public minBet = 'Min bet is 100';
+    string public winnerResult;
     uint public sideAMoney;
     uint public sideBMoney;
+    uint public sideWinnerMoney;
+    uint public sideLoserMoney;
     address[] public addressesA;
     address[] public addressesB;
-    address[] public winners;
+    address[] public winnersAddresses;
     
 
     
     struct Bet {
+        uint betId;
         address userAddress;
         uint betValue;
         bool betCreated;
@@ -25,6 +29,7 @@ contract Bets {
 
      struct Winner {
          uint award;
+         bool awardReceived;
      }
 
   
@@ -32,7 +37,7 @@ contract Bets {
     mapping(address => Bet) public _betsB;
     mapping(address => Winner) public _winners;
 
-    event BetSuccessful(address from, uint value, string side);
+    event BetSuccessful(address from, uint value, string side, uint betId);
     event BenefitSuccessful(address to, uint award);
     event BettingClosed(uint adminFee);
 
@@ -54,9 +59,9 @@ contract Bets {
     _;
     }
 
-    
+        
     function startBetting() onlyAdmin() returns(bool) {
-        if(winners.length == 0 && status == Status.Finished){
+        if(winnersAddresses.length == 0 && status == Status.Finished){
            status = Status.NotStarted;
         }
         
@@ -99,64 +104,66 @@ contract Bets {
         return c;
     }
 
-    
-
+   
     function bet(string side) payable onlyNotAdmin() returns(bool) {
         if(status != Status.Started || msg.value < 100) { throw; }
-        
+        uint betId;
+
         if(sha3(side) == sha3(aSide)){
             sideAMoney = add(sideAMoney, msg.value);
 
             if(_betsA[msg.sender].betCreated == false){
+                addressesA.push(msg.sender);
                 _betsA[msg.sender].userAddress = msg.sender;
                 _betsA[msg.sender].betValue = msg.value;
                 _betsA[msg.sender].betCreated = true;
-                
-                addressesA.push(msg.sender);
-            } else {
-                _betsA[msg.sender].betValue = add(_betsA[msg.sender].betValue, msg.value);
-                
+                _betsA[msg.sender].betId = addressesA.length;
+             } else {
+                _betsA[msg.sender].betValue = add(_betsA[msg.sender].betValue, msg.value);                
             }
+            betId = _betsA[msg.sender].betId;
+
         } else if(sha3(side) == sha3(bSide)){
             sideBMoney = add(sideBMoney, msg.value);
 
              if(_betsB[msg.sender].betCreated == false){
+                addressesB.push(msg.sender);
                 _betsB[msg.sender].userAddress = msg.sender;
                 _betsB[msg.sender].betValue = msg.value;
                 _betsB[msg.sender].betCreated = true;
-                
-                addressesB.push(msg.sender);
+                _betsB[msg.sender].betId = addressesB.length;
             } else {
                 _betsB[msg.sender].betValue = add(_betsB[msg.sender].betValue, msg.value);
                 
             }
+            betId = _betsB[msg.sender].betId;
+
         } else  { return false; }
 
         if(this.balance != sideAMoney + sideBMoney){
             throw;
         }
 
-        BetSuccessful(msg.sender, msg.value, side);
+        BetSuccessful(msg.sender, msg.value, side, betId);
         return true;
         
-        }
+    }
 
     function closeBetting(string winnerSide) onlyAdmin() returns(bool){               
-        uint sideWinnerMoney;
-        uint sideLoserMoney;
-
+        
         if(status != Status.Started) { return false; }    
-        status = Status.Finished;         
+        status = Status.Finished; 
+        winnerResult = winnerSide;        
         
         if(sha3(winnerSide) == sha3(aSide)){
             sideWinnerMoney = sideAMoney;
             sideLoserMoney = sideBMoney;
-            winners = addressesA;        
+            winnersAddresses = addressesA;        
         }
         else if(sha3(winnerSide) == sha3(bSide)){
             sideWinnerMoney = sideBMoney;
             sideLoserMoney = sideAMoney;
-            winners = addressesB;
+            winnersAddresses = addressesB;
         }
         else{ throw; }
         
@@ -169,54 +176,39 @@ contract Bets {
 
         BettingClosed(adminFee);
 
-        sideLoserMoney = sideLoserMoney - adminFee;
-
-            for(uint i = 0; i < winners.length; i++)
-            {           
-                
-                Bet memory winner;
-                
-                if(sha3(winnerSide) == sha3(aSide)){
-                    winner = _betsA[winners[i]];
-                }
-                else{
-                    winner = _betsB[winners[i]];
-                }
-
-                uint profitCash = sideLoserMoney * winner.betValue / sideWinnerMoney;
-                
-                _winners[winners[i]].award = winner.betValue + profitCash;
-                                   
-            }                   
+        sideLoserMoney = sideLoserMoney - adminFee;                        
             
         return true;
 
     }
 
-    function sendSingleReward() external returns(bool){
-        if(status != Status.Finished || winners.length == 0) { throw; }     
+    function sendSingleReward(uint betId) external returns(bool){
+        Bet memory winBet;
+        uint winnerIndex = betId - 1;
+        Winner memory winner = _winners[winnersAddresses[winnerIndex]];
+        if(status != Status.Finished || winnersAddresses.length == 0 || winner.awardReceived == true) { throw; }                                  
         
-        if(!winners[0].send(_winners[winners[0]].award)){
+                
+        if(sha3(winnerResult) == sha3(aSide)){
+            winBet = _betsA[winnersAddresses[winnerIndex]];
+        }
+        else{
+            winBet = _betsB[winnersAddresses[winnerIndex]];
+        }
+
+        uint profitCash = sideLoserMoney * winBet.betValue / sideWinnerMoney;
+                
+        winner.award = winBet.betValue + profitCash;
+        winner.awardReceived = true;                           
+           
+
+        if(!winnersAddresses[winnerIndex].send(winBet.betValue + profitCash)){
                  throw;
         }  
         
-        BenefitSuccessful(winners[0], _winners[winners[0]].award); 
-        removeFromWinners(0);
+        BenefitSuccessful(winnersAddresses[winnerIndex], winner.award); 
         
         return true;
 
-    }
-
-    function removeFromWinners(uint index)  returns(address[]) {
-        if (index >= winners.length) return;
-
-        for (uint i = index; i < winners.length - 1; i++){
-            winners[i] = winners[i+1];
-        }
-        delete winners[winners.length-1];
-        winners.length--;
-
-        return winners;
-    }
-
+    }   
 }
