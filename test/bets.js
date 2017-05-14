@@ -26,7 +26,7 @@ contract('Bets', function(accounts) {
     let user2StartBalance;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => user1StartBalance = web3.eth.getBalance(user1))    
     .then(() => bets.bet('a', {from: user1, value: amount1, gasPrice: gasPrice}))
         .then((result) => assert.equal(web3.eth.getBalance(user1).valueOf(),
@@ -35,6 +35,38 @@ contract('Bets', function(accounts) {
     .then(() => bets.bet('b', {from: user2, value: amount2, gasPrice: gasPrice}))
         .then((result) => assert.equal(web3.eth.getBalance(user2).valueOf(),
         user2StartBalance.sub(gasPrice.mul(result.receipt.gasUsed)).sub(amount2).valueOf()))
+    });
+
+    it('should not allow to get the same reward more than one time', () => {
+    const user1 = accounts[2];
+    const user2 = accounts[3];
+    const amount1 = 100;
+    const amount2 = 200;
+    const totalBet = amount1 + amount2;
+    const adminFee = amount2 / 10;
+    let user1StartBalance;
+    let betId;
+
+    return Promise.resolve()
+    .then(() => bets.startBetting(5, {from: admin}))
+    .then(() => bets.bet('a', {from: user1, value: amount1}))
+      .then(result => {
+         assert.equal(result.logs.length, 1);
+         assert.equal(result.logs[0].event, 'BetSuccessful');
+         assert.equal(result.logs[0].args.from, user1);
+         assert.equal(result.logs[0].args.value.valueOf(), amount1);
+         assert.equal(result.logs[0].args.side, 'a');
+         betId = result.logs[0].args.betId;
+     })
+    .then(() => bets.bet('b', {from: user2, value: amount2}))
+    .then(() => bets.getContractBalance.call())
+      .then(asserts.equal(totalBet))
+    .then(() => user1StartBalance = web3.eth.getBalance(user1)) 
+    .then(() => bets.closeBetting('a', {from: admin}))
+    .then(() => bets.sendSingleReward(betId, {from: admin}))
+     .then(() => assert.equal(web3.eth.getBalance(user1).valueOf(),
+        user1StartBalance.add(totalBet).sub(adminFee).valueOf()))
+    .then(() => asserts.throws(bets.sendSingleReward(betId, {from: admin})));
     });
 
     it('should check winners wallets after close betting and sending reward', () => {
@@ -48,7 +80,7 @@ contract('Bets', function(accounts) {
     let betId;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
       .then(result => {
          assert.equal(result.logs.length, 1);
@@ -79,7 +111,7 @@ contract('Bets', function(accounts) {
     let adminBalance;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount1}))
     .then(() => bets.bet('a', {from: user1, value: amount2}))
@@ -98,7 +130,7 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => bets.closeBetting('a', {from: admin}))
@@ -117,7 +149,7 @@ contract('Bets', function(accounts) {
 
   it('should allow to start Betting', () => {
      return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.isBettingStarted.call({from: admin}))
       .then(asserts.equal(true));
   });
@@ -126,7 +158,7 @@ contract('Bets', function(accounts) {
     const user = accounts[2];
     
     return Promise.resolve()
-    .then(() => bets.startBetting.call({from: user}))
+    .then(() => bets.startBetting.call(5, {from: user}))
       .then(asserts.equal(false));
   });
 
@@ -140,7 +172,7 @@ contract('Bets', function(accounts) {
   it('should not allow to bet for admin', () => {
     const amount = 100;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet.call('a', {from: admin, value: amount}))
       .then(asserts.equal(false))
   });
@@ -157,7 +189,7 @@ contract('Bets', function(accounts) {
     const user = accounts[2];
     const amount = 100;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user, value: amount}))
       .then(result => {
           assert.equal(result.logs.length, 1);
@@ -173,7 +205,7 @@ contract('Bets', function(accounts) {
     const user = accounts[2];
     const amount = 100;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('b', {from: user, value: amount}))
       .then(result => {
           assert.equal(result.logs.length, 1);
@@ -195,14 +227,14 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('a', {from: user3, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => bets.bet('a', {from: user4, value: amount1}))
     .then(() => bets.bet('b', {from: user5, value: amount2}))
     .then(() => bets.closeBetting.call('a', {from: admin}))
-      .then(asserts.equal(true));
+       .then(asserts.equal(true));
   });
 
   it('should emit BenefitSuccessful event on sending single reward', () => {
@@ -213,7 +245,7 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => bets.bet('a', {from: user3, value: amount1}))
@@ -243,7 +275,7 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => bets.bet('a', {from: user3, value: amount1}))
@@ -260,7 +292,7 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => asserts.throws(bets.sendSingleReward({from: admin})));
@@ -275,7 +307,7 @@ contract('Bets', function(accounts) {
     const adminFee = totalBet / 20;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount1}))
     .then(() => bets.bet('a', {from: user1, value: amount2}))
@@ -303,7 +335,7 @@ contract('Bets', function(accounts) {
     const adminFee = totalBet / 20;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount1}))
     .then(() => asserts.throws(bets.startBetting({from: admin})));
@@ -313,7 +345,7 @@ contract('Bets', function(accounts) {
     const user = accounts[2];
     const amount = 100;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet.call('c', {from: user, value: amount}))
       .then(asserts.equal(false));    
   });
@@ -322,7 +354,7 @@ contract('Bets', function(accounts) {
     const user = accounts[2];
     const amount = 50;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => asserts.throws(bets.bet('b', {from: user, value: amount})));
   });
 
@@ -332,7 +364,7 @@ contract('Bets', function(accounts) {
     const amount1 = 100;
     const amount2 = 200;
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount1}))
     .then(() => asserts.throws(bets.closeBetting('c', {from: admin})));
@@ -349,7 +381,7 @@ contract('Bets', function(accounts) {
     let adminBalance;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.bet('b', {from: user2, value: amount2}))
     .then(() => bets.getContractBalance.call())
@@ -373,7 +405,7 @@ contract('Bets', function(accounts) {
     let adminBalance;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => adminBalance = web3.eth.getBalance(admin)) 
     .then(() => bets.closeBetting('b', {from: admin, gasPrice: gasPrice}))
@@ -391,7 +423,7 @@ contract('Bets', function(accounts) {
     let userStartBalance;
 
     return Promise.resolve()
-    .then(() => bets.startBetting({from: admin}))
+    .then(() => bets.startBetting(5, {from: admin}))
     .then(() => bets.bet('a', {from: user1, value: amount1}))
     .then(() => bets.getContractBalance.call())
       .then(asserts.equal(totalBet))
@@ -403,5 +435,32 @@ contract('Bets', function(accounts) {
     .then(() => bets.getContractBalance.call())
       .then(asserts.equal(0));
     });
+
+   it('should not allow to place bet after deadline async', () => {
+    const user1 = accounts[2];
+    const user2 = accounts[3];
+    const user3 = accounts[4];
+    const user4 = accounts[5];
+    const user5 = accounts[6];
+    const amount1 = 100;
+    const amount2 = 200;
+    return Promise.resolve()
+    .then(() => bets.startBetting(5, {from: admin}))
+    .then(() => bets.bet('a', {from: user1, value: amount1}))
+    .then(() => bets.bet('a', {from: user3, value: amount1}))
+    .then(() => bets.bet('b', {from: user2, value: amount2}))
+    .then(() => bets.bet('a', {from: user4, value: amount1}))
+    .then(() => bets.bet('b', {from: user5, value: amount2}))
+    .then(() => {return new Promise((resolve, reject) => {
+          web3.currentProvider.sendAsync({
+                  jsonrpc: "2.0",
+                  method: "evm_increaseTime",
+                  params: [6],
+                  id: new Date().getTime()
+              }, (error, result) => error ? reject(error) : resolve(result.result))
+            })
+    })
+    .then(() => asserts.throws(bets.bet('b', {from: user5, value: amount2})))
+  });
   
  });
