@@ -3,21 +3,11 @@ pragma solidity ^0.4.8;
 contract Bets {
     
     enum Status { NotStarted, Started, Finished }
-    Status public status = Status.NotStarted;
-    address public admin;
-
-    uint public deadline;
+    address public admin;   
     string public aSide = 'a';
     string public bSide = 'b';
-    string public minBet = 'Min bet is 100';
-    string public winnerResult;
-    uint public sideAMoney;
-    uint public sideBMoney;
-    uint public sideWinnerMoney;
-    uint public sideLoserMoney;
-    address[] public addressesA;
-    address[] public addressesB;
-    
+    string public minBet = 'Min bet is 100';   
+
     struct Bet {
         uint betId;
         address userAddress;
@@ -29,11 +19,28 @@ contract Bets {
          uint award;
          bool awardReceived;
      }
-  
-    mapping(address => Bet) public _betsA;
-    mapping(address => Bet) public _betsB;
-    mapping(address => Winner) public _winners;
 
+    struct Game {
+        Status status;
+        uint deadline;
+        string winnerResult;
+        uint sideAMoney;
+        uint sideBMoney;
+        uint sideWinnerMoney;
+        uint sideLoserMoney;
+        uint aCount;
+        uint bCount;
+
+        mapping(uint => address) addressesA;
+        mapping(uint => address) addressesB;
+        mapping(address => Bet) _betsA;
+        mapping(address => Bet) _betsB;
+        mapping(address => Winner) _winners;
+    }
+
+    mapping(uint => Game) public _games;
+    uint public gamesCount;
+    
     event BetSuccessful(address from, uint value, string side, uint betId);
     event BenefitSuccessful(address to, uint award);
     event BettingClosed(uint adminFee);
@@ -58,19 +65,25 @@ contract Bets {
      
         
     function startBetting(uint duration) onlyAdmin() returns(bool) {
-        deadline = add(now, duration);
-        if(sideWinnerMoney == 0 && status == Status.Finished){
-           status = Status.NotStarted;
-        }
         
-        if(status != Status.NotStarted) { throw; }
+        gamesCount++;
+        _games[gamesCount] = Game({
+            status: Status.Started,
+            deadline: add(now, duration),
+            sideAMoney: 0,
+            sideBMoney: 0,
+            sideWinnerMoney: 0,
+            sideLoserMoney: 0,
+            aCount: 0,
+            bCount: 0,
+            winnerResult: 'no result'            
 
-        status = Status.Started;
+        });
         return true;
     }
 
-    function isBettingStarted() returns(bool) {
-        if(status == Status.Started){
+    function isBettingStarted(uint gameId) returns(bool) {
+        if(_games[gameId].status == Status.Started){
             return true;
         }else {return false;}
     }
@@ -79,11 +92,11 @@ contract Bets {
         return minBet;
     }
 
-    function getBetAmount(string side) returns(uint){
+    function getBetAmount(uint gameId, string side) returns(uint){
         if(sha3(side) == sha3(aSide)){
-            return _betsA[msg.sender].betValue;
+            return _games[gameId]._betsA[msg.sender].betValue;
         } else if(sha3(side) == sha3(bSide)){
-            return _betsB[msg.sender].betValue;
+            return _games[gameId]._betsB[msg.sender].betValue;
         } else { throw; }
     }
 
@@ -101,42 +114,44 @@ contract Bets {
         return c;
     }
    
-    function bet(string side) payable onlyNotAdmin() returns(bool) {
-        if(status != Status.Started || msg.value < 100 || now > deadline) { throw; }
+    function bet(uint gameId, string side) payable onlyNotAdmin() returns(bool) {
+        if(_games[gameId].status != Status.Started || msg.value < 100 || now > _games[gameId].deadline) { throw; }
         uint betId;
 
         if(sha3(side) == sha3(aSide)){
-            sideAMoney = add(sideAMoney, msg.value);
+            _games[gameId].sideAMoney = add(_games[gameId].sideAMoney, msg.value);
 
-            if(_betsA[msg.sender].betCreated == false){
-                addressesA.push(msg.sender);
-                _betsA[msg.sender].userAddress = msg.sender;
-                _betsA[msg.sender].betValue = msg.value;
-                _betsA[msg.sender].betCreated = true;
-                _betsA[msg.sender].betId = addressesA.length;
+            if(_games[gameId]._betsA[msg.sender].betCreated == false){
+                _games[gameId]._betsA[msg.sender].userAddress = msg.sender;
+                _games[gameId]._betsA[msg.sender].betValue = msg.value;
+                _games[gameId]._betsA[msg.sender].betCreated = true;
+                _games[gameId].aCount++;
+                _games[gameId]._betsA[msg.sender].betId = _games[gameId].aCount;
+                _games[gameId].addressesA[_games[gameId].aCount] = msg.sender;
              } else {
-                _betsA[msg.sender].betValue = add(_betsA[msg.sender].betValue, msg.value);                
+                _games[gameId]._betsA[msg.sender].betValue = add(_games[gameId]._betsA[msg.sender].betValue, msg.value);                
             }
-            betId = _betsA[msg.sender].betId;
+            betId = _games[gameId]._betsA[msg.sender].betId;
 
         } else if(sha3(side) == sha3(bSide)){
-            sideBMoney = add(sideBMoney, msg.value);
+            _games[gameId].sideBMoney = add(_games[gameId].sideBMoney, msg.value);
 
-             if(_betsB[msg.sender].betCreated == false){
-                addressesB.push(msg.sender);
-                _betsB[msg.sender].userAddress = msg.sender;
-                _betsB[msg.sender].betValue = msg.value;
-                _betsB[msg.sender].betCreated = true;
-                _betsB[msg.sender].betId = addressesB.length;
+             if(_games[gameId]._betsB[msg.sender].betCreated == false){
+                _games[gameId]._betsB[msg.sender].userAddress = msg.sender;
+                _games[gameId]._betsB[msg.sender].betValue = msg.value;
+                _games[gameId]._betsB[msg.sender].betCreated = true;
+                _games[gameId].bCount++;
+                _games[gameId]._betsB[msg.sender].betId = _games[gameId].bCount;
+                _games[gameId].addressesB[_games[gameId].bCount] = msg.sender;
             } else {
-                _betsB[msg.sender].betValue = add(_betsB[msg.sender].betValue, msg.value);
+                _games[gameId]._betsB[msg.sender].betValue = add(_games[gameId]._betsB[msg.sender].betValue, msg.value);
                 
             }
-            betId = _betsB[msg.sender].betId;
+            betId = _games[gameId]._betsB[msg.sender].betId;
 
         } else  { return false; }
 
-        if(this.balance != sideAMoney + sideBMoney){
+        if(this.balance != _games[gameId].sideAMoney + _games[gameId].sideBMoney){
             throw;
         }
 
@@ -144,59 +159,58 @@ contract Bets {
         return true;
     }
 
-    function closeBetting(string winnerSide) onlyAdmin() returns(bool){               
+    function closeBetting(uint gameId, string winnerSide) onlyAdmin() returns(bool){               
         
-        if(status != Status.Started) { return false; }    
-        status = Status.Finished; 
-        winnerResult = winnerSide;        
+        if(_games[gameId].status != Status.Started) { return false; }    
+        _games[gameId].status = Status.Finished; 
+        _games[gameId].winnerResult = winnerSide;        
         
         if(sha3(winnerSide) == sha3(aSide)){
-            sideWinnerMoney = sideAMoney;
-            sideLoserMoney = sideBMoney;
+            _games[gameId].sideWinnerMoney = _games[gameId].sideAMoney;
+            _games[gameId].sideLoserMoney = _games[gameId].sideBMoney;
         }
         else if(sha3(winnerSide) == sha3(bSide)){
-            sideWinnerMoney = sideBMoney;
-            sideLoserMoney = sideAMoney;
+            _games[gameId].sideWinnerMoney = _games[gameId].sideBMoney;
+            _games[gameId].sideLoserMoney = _games[gameId].sideAMoney;
         }
         else{ throw; }
         
-        uint adminFee = sideLoserMoney / 10;
+        uint adminFee = _games[gameId].sideLoserMoney / 10;
 
         if(!admin.send(adminFee)){
                   throw;
         } 
 
         BettingClosed(adminFee);
-        sideLoserMoney = sideLoserMoney - adminFee;                        
+        _games[gameId].sideLoserMoney = _games[gameId].sideLoserMoney - adminFee;                        
         return true;
     }
 
-    function sendSingleReward(uint betId) external returns(bool){
+    function sendSingleReward(uint gameId, uint betId) external returns(bool){
         Bet memory winBet;
         address winnerAddress;
-        uint winnerIndex = betId - 1;
+
+        if(_games[gameId].status != Status.Finished || _games[gameId].sideWinnerMoney == 0) { throw; }                                  
         
-        if(status != Status.Finished || sideWinnerMoney == 0) { throw; }                                  
-        
-        if(sha3(winnerResult) == sha3(aSide)){
-            winBet = _betsA[addressesA[winnerIndex]];
-            winnerAddress = addressesA[winnerIndex];
+        if(sha3(_games[gameId].winnerResult) == sha3(aSide)){
+            winBet = _games[gameId]._betsA[_games[gameId].addressesA[betId]];
+            winnerAddress = _games[gameId].addressesA[betId];
         }
         else{
-            winBet = _betsB[addressesB[winnerIndex]];
-            winnerAddress = addressesB[winnerIndex];
+            winBet = _games[gameId]._betsB[_games[gameId].addressesB[betId]];
+            winnerAddress = _games[gameId].addressesB[betId];
         }
 
-        if(_winners[winnerAddress].awardReceived == true) { throw; }
+        if(_games[gameId]._winners[winnerAddress].awardReceived == true || winBet.betValue == 0) { throw; }
 
-        uint profitCash = sideLoserMoney * winBet.betValue / sideWinnerMoney;
+        uint profitCash = _games[gameId].sideLoserMoney * winBet.betValue / _games[gameId].sideWinnerMoney;
                 
-        _winners[winnerAddress].award = winBet.betValue + profitCash;
-        _winners[winnerAddress].awardReceived = true;                           
+        _games[gameId]._winners[winnerAddress].award = winBet.betValue + profitCash;
+        _games[gameId]._winners[winnerAddress].awardReceived = true;                           
            
-        if(!winBet.userAddress.send(_winners[winnerAddress].award)) { throw; }  
+        if(!winBet.userAddress.send(_games[gameId]._winners[winnerAddress].award)) { throw; }  
         
-        BenefitSuccessful(winBet.userAddress, _winners[winnerAddress].award); 
+        BenefitSuccessful(winBet.userAddress, _games[gameId]._winners[winnerAddress].award); 
         return true;
     } 
 
