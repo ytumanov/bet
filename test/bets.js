@@ -195,20 +195,21 @@ contract('Bets', function(accounts) {
     .then(() => bets.bet(1, 'b', {from: user2, value: amount2}))
     .then(() => bets.bet(1, 'a', {from: user3, value: amount1}))
     .then(() => bets.bet(1, 'b', {from: user4, value: amount2}))
+    .then(() => bets.bet(1, 'a', {from: user3, value: amount2}))
     .then(() => bets.closeBetting(1, 'a', {from: admin}))
     .then(() => bets.sendSingleReward(1, 1, {from: admin}))
        .then(result => {
           assert.equal(result.logs.length, 1);
           assert.equal(result.logs[0].event, 'BenefitSuccessful');
           assert.equal(result.logs[0].args.to, user1);
-          assert.equal(result.logs[0].args.award.valueOf(), 280);
+          assert.equal(result.logs[0].args.award.valueOf(), 190);
       })
     .then(() => bets.sendSingleReward(1, 2, {from: admin}))
       .then(result => {
           assert.equal(result.logs.length, 1);
           assert.equal(result.logs[0].event, 'BenefitSuccessful'); 
           assert.equal(result.logs[0].args.to, user3);
-          assert.equal(result.logs[0].args.award.valueOf(), 280);  
+          assert.equal(result.logs[0].args.award.valueOf(), 570);  
       });
   });
 
