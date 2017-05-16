@@ -12,7 +12,6 @@ contract Bets {
         uint betId;
         address userAddress;
         uint betValue;
-        bool betCreated;
      }
 
      struct Winner {
@@ -121,32 +120,27 @@ contract Bets {
         if(sha3(side) == sha3(aSide)){
             _games[gameId].sideAMoney = add(_games[gameId].sideAMoney, msg.value);
 
-            if(_games[gameId]._betsA[msg.sender].betCreated == false){
+            if(_games[gameId]._betsA[msg.sender].betValue == 0){
                 _games[gameId]._betsA[msg.sender].userAddress = msg.sender;
-                _games[gameId]._betsA[msg.sender].betValue = msg.value;
-                _games[gameId]._betsA[msg.sender].betCreated = true;
                 _games[gameId].aCount++;
                 _games[gameId]._betsA[msg.sender].betId = _games[gameId].aCount;
                 _games[gameId].addressesA[_games[gameId].aCount] = msg.sender;
-             } else {
-                _games[gameId]._betsA[msg.sender].betValue = add(_games[gameId]._betsA[msg.sender].betValue, msg.value);                
-            }
+             }
+            _games[gameId]._betsA[msg.sender].betValue += msg.value;
+                 
             betId = _games[gameId]._betsA[msg.sender].betId;
 
         } else if(sha3(side) == sha3(bSide)){
             _games[gameId].sideBMoney = add(_games[gameId].sideBMoney, msg.value);
 
-             if(_games[gameId]._betsB[msg.sender].betCreated == false){
+             if(_games[gameId]._betsB[msg.sender].betValue == 0){
                 _games[gameId]._betsB[msg.sender].userAddress = msg.sender;
-                _games[gameId]._betsB[msg.sender].betValue = msg.value;
-                _games[gameId]._betsB[msg.sender].betCreated = true;
                 _games[gameId].bCount++;
                 _games[gameId]._betsB[msg.sender].betId = _games[gameId].bCount;
                 _games[gameId].addressesB[_games[gameId].bCount] = msg.sender;
-            } else {
-                _games[gameId]._betsB[msg.sender].betValue = add(_games[gameId]._betsB[msg.sender].betValue, msg.value);
-                
             }
+            _games[gameId]._betsB[msg.sender].betValue += msg.value;
+
             betId = _games[gameId]._betsB[msg.sender].betId;
 
         } else  { return false; }
