@@ -118,7 +118,7 @@ contract Bets {
         uint betId;
 
         if(sha3(side) == sha3(aSide)){
-            _games[gameId].sideAMoney = add(_games[gameId].sideAMoney, msg.value);
+            _games[gameId].sideAMoney += msg.value;
 
             if(_games[gameId]._betsA[msg.sender].betValue == 0){
                 _games[gameId]._betsA[msg.sender].userAddress = msg.sender;
@@ -131,7 +131,7 @@ contract Bets {
             betId = _games[gameId]._betsA[msg.sender].betId;
 
         } else if(sha3(side) == sha3(bSide)){
-            _games[gameId].sideBMoney = add(_games[gameId].sideBMoney, msg.value);
+            _games[gameId].sideBMoney += msg.value;
 
              if(_games[gameId]._betsB[msg.sender].betValue == 0){
                 _games[gameId]._betsB[msg.sender].userAddress = msg.sender;
@@ -144,10 +144,6 @@ contract Bets {
             betId = _games[gameId]._betsB[msg.sender].betId;
 
         } else  { return false; }
-
-        if(this.balance != _games[gameId].sideAMoney + _games[gameId].sideBMoney){
-            throw;
-        }
 
         BetSuccessful(msg.sender, msg.value, side, betId);
         return true;
@@ -187,12 +183,12 @@ contract Bets {
         if(_games[gameId].status != Status.Finished || _games[gameId].sideWinnerMoney == 0) { throw; }                                  
         
         if(sha3(_games[gameId].winnerResult) == sha3(aSide)){
-            winBet = _games[gameId]._betsA[_games[gameId].addressesA[betId]];
             winnerAddress = _games[gameId].addressesA[betId];
+            winBet = _games[gameId]._betsA[winnerAddress];            
         }
         else{
-            winBet = _games[gameId]._betsB[_games[gameId].addressesB[betId]];
-            winnerAddress = _games[gameId].addressesB[betId];
+            winnerAddress = _games[gameId].addressesB[betId];           
+            winBet = _games[gameId]._betsB[winnerAddress];
         }
 
         if(_games[gameId]._winners[winnerAddress].awardReceived == true || winBet.betValue == 0) { throw; }
