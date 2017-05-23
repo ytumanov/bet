@@ -2,7 +2,7 @@ pragma solidity ^0.4.8;
 
 contract Bets {
     
-    enum Status { NotStarted, Started, Finished }
+    enum Status { NotStarted, Started, Finished, Draw }
     address public admin;   
     string public aSide = 'a';
     string public bSide = 'b';
@@ -43,6 +43,8 @@ contract Bets {
     event BetSuccessful(address from, uint value, string side, uint betId);
     event BenefitSuccessful(address to, uint award);
     event BettingClosed(uint adminFee);
+    event Draw(uint gameId);
+    event RefundSent(address to, uint refund);
 
     function Bets() {
         admin = msg.sender;
@@ -174,6 +176,32 @@ contract Bets {
         BettingClosed(adminFee);
         _games[gameId].sideLoserMoney = _games[gameId].sideLoserMoney - adminFee;                        
         return true;
+    }
+
+    function closeDraw(uint gameId) onlyAdmin() returns(bool){
+        if(_games[gameId].status != Status.Started) { return false; }  
+        _games[gameId].status = Status.Draw;
+        Draw(gameId);
+        return true;
+    }
+
+    function moneyBack(uint gameId) onlyNotAdmin() returns(bool){
+        if(_games[gameId].status != Status.Draw) { return false; } 
+
+        uint refund = _games[gameId]._betsA[msg.sender].betValue + _games[gameId]._betsB[msg.sender].betValue;
+              
+        if(!msg.sender.send(refund)) { throw; }
+        RefundSent(msg.sender, refund);
+
+        if(_games[gameId]._betsA[msg.sender].betValue != 0){
+            delete _games[gameId]._betsA[msg.sender];
+        }
+        
+        if(_games[gameId]._betsB[msg.sender].betValue != 0){
+            delete _games[gameId]._betsB[msg.sender];
+        }
+
+        return true;  
     }
 
     function sendSingleReward(uint gameId, uint betId) external returns(bool){

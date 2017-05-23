@@ -2,6 +2,8 @@ const Reverter = require('./helpers/reverter');
 const Asserts = require('./helpers/asserts');
 const Bets = artifacts.require('./Bets.sol');
 
+const Promise = require('bluebird');
+
 contract('Bets', function(accounts) {
   const reverter = new Reverter(web3);
   afterEach('revert', reverter.revert);
@@ -449,9 +451,52 @@ contract('Bets', function(accounts) {
     .then(() => bets.closeBetting(2, 'a', {from: admin}))
     .then(() => bets.sendSingleReward(2, 1, {from: admin}))
     .then(() => bets.getContractBalance.call())
-      .then(asserts.equal(0))
+      .then(asserts.equal(0));
 
 
+    });
+
+    it('should allow to close game as draw and get a refund', () =>{
+    const user1 = accounts[2];
+    const user2 = accounts[3];
+    const user3 = accounts[4];
+    const amount1 = 100;
+    const amount2 = 200;
+    const user2refund = amount2 * 2 + amount1;
+    return Promise.resolve()
+    .then(() => bets.startBetting(5, {from: admin}))
+    .then(() => bets.bet(1, 'a', {from: user1, value: amount1}))
+    .then(() => bets.bet(1, 'b', {from: user2, value: amount2}))
+    .then(() => bets.bet(1, 'b', {from: user2, value: amount2}))
+    .then(() => bets.bet(1, 'a', {from: user2, value: amount1}))
+    .then(() => bets.closeDraw(1, {from: admin}))
+      .then(result => {
+         assert.equal(result.logs.length, 1);
+         assert.equal(result.logs[0].event, 'Draw');
+         assert.equal(result.logs[0].args.gameId.valueOf(), 1);
+      })
+    .then(() => bets.moneyBack(1, 1, {from: user2}))
+      .then(result => {
+         assert.equal(result.logs.length, 1);
+         assert.equal(result.logs[0].event, 'RefundSent');
+         assert.equal(result.logs[0].args.to, user2);
+         assert.equal(result.logs[0].args.refund.valueOf(), user2refund);
+      })
+    .then(() => bets.getContractBalance.call())
+      .then(asserts.equal(amount1))
+    });
+
+    it('should be possible to make bets in loop via bluebird each', () => {
+      var users = accounts.slice(1);
+      const amount1 = 100;
+
+      return Promise.resolve()
+    .then(() => bets.startBetting(10, {from: admin}))
+    .then(() => Promise.each(users, (user) => 
+      bets.bet(1, 'a', {from: user, value: amount1})
+      ))
+    .then(() => bets.getContractBalance.call())
+      .then(asserts.equal(10000));
     });
   
  });
