@@ -494,9 +494,77 @@ contract('Bets', function(accounts) {
     .then(() => bets.startBetting(10, {from: admin}))
     .then(() => Promise.each(users, (user) => 
       bets.bet(1, 'a', {from: user, value: amount1})
-      ))
+    ))
     .then(() => bets.getContractBalance.call())
       .then(asserts.equal(10000));
     });
   
+    it('should allow to make 100 bets on 2 games: with draw and game with winners', () => {
+      const usersDrawA = accounts.slice(1, 26);
+      const usersDrawB = accounts.slice(26, 51);
+      const usersA = accounts.slice(51, 76);
+      const usersB = accounts.slice(76, 101);
+      const amount1 = 100;
+      var gasSpent = 0;
+      
+      var array25 = new Array();
+      for (var i = 0; i < 25; i++) {
+        array25[i] = i + 1;        
+      }     
+
+      return Promise.resolve()
+      .then(() => bets.startBetting(10, {from: admin}))
+        .then((result) => gasSpent += result.receipt.gasUsed)
+      .then(() => bets.startBetting(10, {from: admin}))
+        .then((result) => gasSpent += result.receipt.gasUsed)
+
+
+      .then(() => Promise.each(usersDrawA, (user) => 
+        bets.bet(1, 'a', {from: user, value: amount1})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => Promise.each(usersDrawB, (user) => 
+        bets.bet(1, 'b', {from: user, value: amount1})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => bets.getContractBalance.call())
+        .then(asserts.equal(5000))
+
+
+        .then(() => Promise.each(usersA, (user) => 
+        bets.bet(2, 'a', {from: user, value: amount1})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => Promise.each(usersB, (user) => 
+        bets.bet(2, 'b', {from: user, value: amount1})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => bets.getContractBalance.call())
+        .then(asserts.equal(10000))
+
+
+      .then(() => bets.closeDraw(1, {from: admin}))
+        .then((result) => gasSpent += result.receipt.gasUsed)
+      .then(() => Promise.each(usersDrawA.concat(usersDrawB), (user) => 
+        bets.moneyBack(1, {from: user})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => bets.getContractBalance.call())
+        .then(asserts.equal(5000))
+
+
+      .then(() => bets.closeBetting(2, 'a', {from: admin}))
+        .then((result) => gasSpent += result.receipt.gasUsed)
+      .then(() => Promise.each(array25, (index) => 
+        bets.sendSingleReward(2, index, {from: admin})
+          .then((result) => gasSpent += result.receipt.gasUsed)
+      ))
+      .then(() => bets.getContractBalance.call())
+        .then(asserts.equal(0))
+
+
+      .then(() => { console.log('Total gas used during test execution - ', gasSpent)});
+
+    });
+
  });
